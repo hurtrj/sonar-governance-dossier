@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Relatório de Issues – SonarQube</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
+      margin: 0;
+      padding: 20px;
+      color: #333;
+    }
+    h1 {
+      margin-bottom: 5px;
+    }
+    .subtitle {
+      color: #666;
+      margin-bottom: 20px;
+    }
+    .panel {
+      background: #fff;
+      padding: 15px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    }
+    .issue {
+      background: #fff;
+      margin-bottom: 12px;
+      border-radius: 6px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    }
+    .issue-header {
+      padding: 10px 15px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      border-left: 6px solid #999;
+    }
+    .minor { border-color: #4caf50; }
+    .major { border-color: #ff9800; }
+    .critical { border-color: #f44336; }
+
+    .issue-body {
+      display: none;
+      padding: 15px;
+      border-top: 1px solid #ddd;
+      background: #fafafa;
+    }
+    pre {
+      background: #eee;
+      padding: 10px;
+      overflow-x: auto;
+      font-size: 13px;
+    }
+    input {
+      padding: 6px;
+      width: 300px;
+    }
+  </style>
+</head>
+
+<body>
+
+<h1>Relatório de Issues – SonarQube</h1>
+<div class="subtitle">
+  Projeto: <strong>serviceorder-ecm-digitaldocuments-svc</strong> |
+  Branch: <strong>feature/ci-only</strong>
+</div>
+
+<div class="panel">
+  📂 Carregar JSON do SonarQube:
+  <input type="file" id="jsonFile" accept=".json" />
+</div>
+
+<div class="panel">
+  🔍 Buscar:
+  <input type="text" id="searchBox" placeholder="mensagem, regra, arquivo..." />
+</div>
+
+<div id="issuesContainer"></div>
+
+<script>
+let issues = [];
+
+document.getElementById("jsonFile").addEventListener("change", function (event) {
+  const file = event.target.files[0];
+  const reader = new FileReader();
+
+  reader.onload = function () {
+    issues = JSON.parse(reader.result);
+    renderIssues("");
+  };
+
+  reader.readAsText(file);
+});
+
+document.getElementById("searchBox").addEventListener("input", e => {
+  renderIssues(e.target.value.toLowerCase());
+});
+
+function renderIssues(filter) {
+  const container = document.getElementById("issuesContainer");
+  container.innerHTML = "";
+
+  issues.forEach(item => {
+    const text = JSON.stringify(item).toLowerCase();
+    if (!text.includes(filter)) return;
+
+    const issue = item.issue;
+    const severity = issue.severity.toLowerCase();
+
+    const div = document.createElement("div");
+    div.className = "issue";
+
+    const header = document.createElement("div");
+    header.className = `issue-header ${severity}`;
+    header.innerHTML = `
+      <div>
+        <strong>${issue.rule}</strong> – ${issue.message}<br/>
+        <small>${issue.component} | linha ${issue.line}</small>
+      </div>
+      <div>${issue.severity}</div>
+    `;
+
+    const body = document.createElement("div");
+    body.className = "issue-body";
+    body.innerHTML = `
+      <h4>Meta</h4>
+      <pre>${JSON.stringify(item.meta, null, 2)}</pre>
+
+      <h4>Issue (completo)</h4>
+      <pre>${JSON.stringify(item.issue, null, 2)}</pre>
+
+      <h4>Regra (completo)</h4>
+      <pre>${JSON.stringify(item.rule, null, 2)}</pre>
+
+      <h4>Erros</h4>
+      <pre>${JSON.stringify(item.errors, null, 2)}</pre>
+    `;
+
+    header.onclick = () => {
+      body.style.display = body.style.display === "none" ? "block" : "none";
+    };
+
+    div.appendChild(header);
+    div.appendChild(body);
+    container.appendChild(div);
+  });
+}
+</script>
+
+</body>
+</html>
