@@ -1,9 +1,9 @@
 #!/bin/bash
 
-SONAR_URL="https://sonarqube-enterprise.prod.cpq.k8s.corp.clarobr"
-PROJECT_KEY="serviceorder-ecm-digitaldocuments-svc"
-BRANCH="feature/ci-only"
-TOKEN="sqa_ce80e1fa650dccfd97c5872a67c068a98d96b514"
+SONAR_URL=""
+PROJECT_KEY="serviceorder"
+BRANCH="feature"
+TOKEN="SEU TOKEN"
 
 OUTPUT="sonarqube-issues-safe.json"
 TIMEOUT=10   # segundos por chamada curl
