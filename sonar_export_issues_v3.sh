@@ -1,139 +1,149 @@
 #!/bin/bash
-
 ###############################################################################
-# Script seguro - coleta de issues SonarQube a partir de URL completa
+# Script: sonar_export_issues_v3.sh
+#
+# Descrição:
+#   Coleta issues do SonarQube a partir da URL da interface web.
+#
+# Token:
+#   export SONAR_TOKEN="SEU_TOKEN_AQUI"  # BATATINHA
 ###############################################################################
 
-set -euo pipefail
+# ===============================
+# VALIDAÇÃO DE DEPENDÊNCIAS
+# ===============================
+command -v curl >/dev/null 2>&1 || { echo "Erro: curl não encontrado"; exit 1; }
+command -v jq   >/dev/null 2>&1 || { echo "Erro: jq não encontrado"; exit 1; }
 
 # ===============================
-# FUNÇÃO DE VALIDAÇÃO
+# ENTRADA DO USUÁRIO
 # ===============================
-validar_param() {
-  local valor="$1"
-  local nome="$2"
-
-  if [[ ! "$valor" =~ ^[a-zA-Z0-9._:/?=&-]+$ ]]; then
-    echo "Erro: $nome inválido -> $valor"
-    exit 1
-  fi
-}
+echo "Cole a URL de issues do SonarQube:"
+read -r SONAR_UI_URL
 
 # ===============================
-# ENTRADA DA URL
+# VALIDAÇÃO DE TOKEN
 # ===============================
-echo "=== Informe a URL do SonarQube (copie do navegador) ==="
-read -p "URL: " SONAR_FULL_URL
-
-if [ -z "$SONAR_FULL_URL" ]; then
-  echo "Erro: URL não informada"
+if [ -z "$SONAR_TOKEN" ]; then
+  echo "Erro: variável SONAR_TOKEN não definida."
   exit 1
 fi
-
-validar_param "$SONAR_FULL_URL" "URL"
 
 # ===============================
 # EXTRAÇÃO DE DADOS DA URL
 # ===============================
+SONAR_URL=$(echo "$SONAR_UI_URL" | cut -d'/' -f1-3)
 
-# Base URL
-SONAR_URL="$(echo "$SONAR_FULL_URL" | awk -F'/dashboard' '{print $1}')"
+PROJECT_KEY=$(echo "$SONAR_UI_URL" | sed -n 's/.*[?&]id=\([^&]*\).*/\1/p')
+BRANCH=$(echo "$SONAR_UI_URL" | sed -n 's/.*[?&]branch=\([^&]*\).*/\1/p')
+STATUSES=$(echo "$SONAR_UI_URL" | sed -n 's/.*[?&]issueStatuses=\([^&]*\).*/\1/p')
+TYPES=$(echo "$SONAR_UI_URL" | sed -n 's/.*[?&]types=\([^&]*\).*/\1/p')
 
-# Project Key
-PROJECT_KEY="$(echo "$SONAR_FULL_URL" | grep -oP 'id=\K[^&]+')"
+# Default se não vier na URL
+[ -z "$BRANCH" ] && BRANCH="main"
+[ -z "$STATUSES" ] && STATUSES="OPEN,CONFIRMED"
 
-# Branch (opcional)
-BRANCH="$(echo "$SONAR_FULL_URL" | grep -oP 'branch=\K[^&]+' || true)"
-BRANCH="${BRANCH:-main}"
+OUTPUT_FILE="sonarqube-issues-safe.json"
+PAGE_SIZE=500
+TIMEOUT=15
+
+echo "=============================================="
+echo "Coleta SonarQube – via URL"
+echo "Host: $SONAR_URL"
+echo "Projeto: $PROJECT_KEY"
+echo "Branch: $BRANCH"
+echo "Statuses: $STATUSES"
+[ -n "$TYPES" ] && echo "Types: $TYPES"
+echo "=============================================="
 
 # ===============================
-# TOKEN (OCULTO)
+# MONTA QUERY DINÂMICA
 # ===============================
-read -s -p "Informe o Token do Sonar: " SONAR_TOKEN
-echo
+QUERY="$SONAR_URL/api/issues/search?componentKeys=$PROJECT_KEY&branch=$BRANCH&statuses=$STATUSES&ps=$PAGE_SIZE"
 
-if [ -z "$SONAR_TOKEN" ]; then
-  echo "Erro: token não informado"
-  exit 1
+if [ -n "$TYPES" ]; then
+  QUERY="$QUERY&types=$TYPES"
 fi
 
 # ===============================
-# VALIDAÇÃO FINAL
+# EXECUÇÃO
 # ===============================
-validar_param "$SONAR_URL" "SONAR_URL"
-validar_param "$PROJECT_KEY" "PROJECT_KEY"
-validar_param "$BRANCH" "BRANCH"
+echo "[" > "$OUTPUT_FILE"
+FIRST_GLOBAL=true
 
-# ===============================
-# LOG DE CONFIG
-# ===============================
-echo
-echo "===== CONFIG EXTRAÍDA ====="
-echo "SONAR_URL  : $SONAR_URL"
-echo "PROJECT_KEY: $PROJECT_KEY"
-echo "BRANCH     : $BRANCH"
-echo "==========================="
-echo
+BASE_JSON=$(curl -sk --max-time "$TIMEOUT" \
+  -u "$SONAR_TOKEN:" \
+  "$QUERY")
 
-# ===============================
-# VALIDAR DEPENDÊNCIAS
-# ===============================
-command -v curl >/dev/null || { echo "Erro: curl não encontrado"; exit 1; }
-command -v jq >/dev/null || { echo "Erro: jq não encontrado"; exit 1; }
+if ! echo "$BASE_JSON" | jq -e '.issues' >/dev/null 2>&1; then
+  echo "Erro ao consultar API."
+  exit 1
+fi
 
-# ===============================
-# CONFIG EXECUÇÃO
-# ===============================
-PAGE_SIZE=100
-OUTPUT_FILE="sonarqube-issues.json"
-page=1
-all_issues="[]"
+echo "$BASE_JSON" | jq -c '.issues[]' | while read -r ISSUE; do
 
-echo "Iniciando coleta..."
+  ISSUE_KEY=$(echo "$ISSUE" | jq -r '.key')
+  RULE_KEY=$(echo "$ISSUE" | jq -r '.rule // empty')
 
-# ===============================
-# LOOP DE PAGINAÇÃO
-# ===============================
-while true; do
-  echo "Coletando página $page..."
+  STATUS="OK"
+  ERRORS=()
+  RULE_JSON="null"
 
-  response_file="response.json"
+  # ===============================
+  # BUSCA DA REGRA
+  # ===============================
+  if [ -n "$RULE_KEY" ]; then
+    RULE_RAW=$(curl -sk --max-time "$TIMEOUT" \
+      -u "$SONAR_TOKEN:" \
+      "$SONAR_URL/api/rules/show?key=$RULE_KEY")
 
-  HTTP_STATUS=$(curl --fail --silent --show-error \
-    --connect-timeout 10 \
-    --retry 3 \
-    -w "%{http_code}" \
-    -o "$response_file" \
-    -u "$SONAR_TOKEN:" \
-    "$SONAR_URL/api/issues/search?componentKeys=$PROJECT_KEY&branch=$BRANCH&page=$page&ps=$PAGE_SIZE")
-
-  if [ "$HTTP_STATUS" -ne 200 ]; then
-    echo "Erro ao chamar API (HTTP $HTTP_STATUS)"
-    exit 1
+    if echo "$RULE_RAW" | jq -e . >/dev/null 2>&1; then
+      if echo "$RULE_RAW" | jq -e '.errors' >/dev/null; then
+        STATUS="PARTIAL"
+        ERRORS+=("Erro ao buscar regra $RULE_KEY")
+      else
+        RULE_JSON="$RULE_RAW"
+      fi
+    else
+      STATUS="PARTIAL"
+      ERRORS+=("Resposta inválida da API de regras")
+    fi
+  else
+    STATUS="PARTIAL"
+    ERRORS+=("Issue sem rule key")
   fi
 
-  issues=$(jq '.issues' "$response_file")
-  count=$(echo "$issues" | jq 'length')
-
-  if [ "$count" -eq 0 ]; then
-    echo "Fim da coleta."
-    break
+  # ===============================
+  # ESCRITA JSON
+  # ===============================
+  if [ "$FIRST_GLOBAL" = false ]; then
+    echo "," >> "$OUTPUT_FILE"
   fi
+  FIRST_GLOBAL=false
 
-  all_issues=$(jq -s 'add' <(echo "$all_issues") <(echo "$issues"))
+  jq -n \
+    --arg projectKey "$PROJECT_KEY" \
+    --arg issueKey "$ISSUE_KEY" \
+    --arg status "$STATUS" \
+    --argjson issue "$ISSUE" \
+    --arg rule "$(echo "$RULE_JSON" | jq -c '.')" \
+    --argjson errors "$(printf '%s\n' "${ERRORS[@]}" | jq -R . | jq -s .)" \
+    '{
+      meta: {
+        projectKey: $projectKey,
+        issueKey: $issueKey,
+        coletaStatus: $status
+      },
+      issue: $issue,
+      rule: ($rule | fromjson?),
+      errors: (if ($errors | length) > 0 then $errors else null end)
+    }' >> "$OUTPUT_FILE"
 
-  page=$((page + 1))
 done
 
-# ===============================
-# SALVAR RESULTADO
-# ===============================
-echo "$all_issues" > "$OUTPUT_FILE"
+echo "]" >> "$OUTPUT_FILE"
 
-echo
-echo "Arquivo gerado: $OUTPUT_FILE"
-echo "Total de issues: $(echo "$all_issues" | jq 'length')"
-
-###############################################################################
-# FIM
-###############################################################################
+echo "=============================================="
+echo "Coleta concluída"
+echo "Arquivo: $OUTPUT_FILE"
+echo "=============================================="
