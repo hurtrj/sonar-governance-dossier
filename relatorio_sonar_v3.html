@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Relatório de Qualidade de Código</title>
+
+<style>
+body {
+  font-family: Arial;
+  background: #f4f6f8;
+  padding: 20px;
+}
+
+/* HEADER */
+h1 {
+  margin-bottom: 5px;
+}
+
+.subtitle {
+  color: #666;
+  margin-bottom: 20px;
+}
+
+/* PAINEL */
+.panel {
+  background: #fff;
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+/* CARDS */
+.stats {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.card {
+  flex: 1;
+  padding: 15px;
+  border-radius: 8px;
+  color: white;
+}
+
+.critical { background: #e74c3c; }
+.warn { background: #f39c12; }
+.ok { background: #2ecc71; }
+
+/* ISSUE */
+.issue {
+  background: #fff;
+  padding: 15px;
+  margin-bottom: 10px;
+  border-radius: 6px;
+  border-left: 6px solid #ccc;
+}
+
+.issue.CRITICAL { border-left-color: #e74c3c; }
+.issue.MAJOR { border-left-color: #f39c12; }
+.issue.MINOR { border-left-color: #2ecc71; }
+
+/* TEXTO */
+.title {
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+.meta {
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 8px;
+}
+
+/* BOTÃO */
+button {
+  background: #3498db;
+  border: none;
+  color: white;
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+/* DETALHE */
+.details {
+  display: none;
+  background: #f8f8f8;
+  padding: 10px;
+  margin-top: 10px;
+  border-radius: 5px;
+  font-size: 12px;
+}
+</style>
+</head>
+
+<body>
+
+<h1>📊 Relatório de Qualidade do Código</h1>
+<div class="subtitle">Visão simplificada para análise rápida</div>
+
+<div class="panel">
+  <input type="file" id="jsonFile">
+  <input type="text" id="searchBox" placeholder="Buscar problema...">
+</div>
+
+<!-- RESUMO -->
+<div class="stats">
+  <div class="card critical">Alta Prioridade: <span id="high">0</span></div>
+  <div class="card warn">Média Prioridade: <span id="medium">0</span></div>
+  <div class="card ok">Baixo Impacto: <span id="low">0</span></div>
+</div>
+
+<div id="issuesContainer"></div>
+
+<script>
+
+let issues = [];
+
+document.getElementById("jsonFile").addEventListener("change", function(e) {
+  const reader = new FileReader();
+
+  reader.onload = function(e) {
+    const raw = JSON.parse(e.target.result);
+    issues = raw.map(i => i.issue || i);
+    updateStats();
+    render();
+  };
+
+  reader.readAsText(e.target.files[0]);
+});
+
+document.getElementById("searchBox").addEventListener("input", render);
+
+
+/* ========= CLASSIFICAÇÃO MAIS HUMANA ========= */
+function classify(severity) {
+  if (severity === "CRITICAL" || severity === "BLOCKER") return "Alta";
+  if (severity === "MAJOR") return "Média";
+  return "Baixa";
+}
+
+
+/* ========= SUMMARY ========= */
+function updateStats() {
+  let high = 0, medium = 0, low = 0;
+
+  issues.forEach(i => {
+    const c = classify(i.severity);
+    if (c === "Alta") high++;
+    else if (c === "Média") medium++;
+    else low++;
+  });
+
+  document.getElementById("high").innerText = high;
+  document.getElementById("medium").innerText = medium;
+  document.getElementById("low").innerText = low;
+}
+
+
+/* ========= RENDER ========= */
+function render() {
+
+  const container = document.getElementById("issuesContainer");
+  container.innerHTML = "";
+
+  const search = document.getElementById("searchBox").value.toLowerCase();
+
+  issues.forEach(issue => {
+
+    const text = JSON.stringify(issue).toLowerCase();
+    if (!text.includes(search)) return;
+
+    const div = document.createElement("div");
+    div.className = "issue " + issue.severity;
+
+    /* título amigável */
+    const title = document.createElement("div");
+    title.className = "title";
+    title.textContent = issue.message || "Problema identificado";
+
+    /* resumo */
+    const meta = document.createElement("div");
+    meta.className = "meta";
+
+    meta.textContent =
+      `Prioridade: ${classify(issue.severity)} | ` +
+      `Tipo: ${issue.type} | ` +
+      `Arquivo afetado: ${(issue.component || "").split(":").pop()}`;
+
+    /* botão */
+    const btn = document.createElement("button");
+    btn.textContent = "Ver detalhes técnicos";
+
+    const details = document.createElement("div");
+    details.className = "details";
+    details.textContent = JSON.stringify(issue, null, 2);
+
+    btn.onclick = () => {
+      details.style.display =
+        details.style.display === "block" ? "none" : "block";
+    };
+
+    div.appendChild(title);
+    div.appendChild(meta);
+    div.appendChild(btn);
+    div.appendChild(details);
+
+    container.appendChild(div);
+  });
+}
+
+</script>
+
+</body>
+</html>
