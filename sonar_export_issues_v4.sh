@@ -1,9 +1,9 @@
 #!/bin/bash
 ###############################################################################
-# Script: sonar_export_issues_v3.sh
+# Script: sonar_export_issues_v4.sh
 #
 # Descrição:
-#   Coleta issues do SonarQube a partir da URL da interface web.
+#   Coleta issues do SonarQube a partir de URL (dashboard ou issues).
 #
 # Token:
 #   export SONAR_TOKEN="SEU_TOKEN_AQUI"  # BATATINHA
@@ -18,8 +18,14 @@ command -v jq   >/dev/null 2>&1 || { echo "Erro: jq não encontrado"; exit 1; }
 # ===============================
 # ENTRADA DO USUÁRIO
 # ===============================
-echo "Cole a URL de issues do SonarQube:"
+echo "Cole a URL do SonarQube (dashboard ou issues):"
 read -r SONAR_UI_URL
+
+# ===============================
+# NORMALIZAÇÃO DA URL
+# ===============================
+# Corrige &amp; -> &
+SONAR_UI_URL=$(echo "$SONAR_UI_URL" | sed 's/&amp;/\&/g')
 
 # ===============================
 # VALIDAÇÃO DE TOKEN
@@ -30,40 +36,48 @@ if [ -z "$SONAR_TOKEN" ]; then
 fi
 
 # ===============================
-# EXTRAÇÃO DE DADOS DA URL
+# EXTRAÇÃO DE DADOS
 # ===============================
 SONAR_URL=$(echo "$SONAR_UI_URL" | cut -d'/' -f1-3)
 
 PROJECT_KEY=$(echo "$SONAR_UI_URL" | sed -n 's/.*[?&]id=\([^&]*\).*/\1/p')
-BRANCH=$(echo "$SONAR_UI_URL" | sed -n 's/.*[?&]branch=\([^&]*\).*/\1/p')
-STATUSES=$(echo "$SONAR_UI_URL" | sed -n 's/.*[?&]issueStatuses=\([^&]*\).*/\1/p')
-TYPES=$(echo "$SONAR_UI_URL" | sed -n 's/.*[?&]types=\([^&]*\).*/\1/p')
 
-# Default se não vier na URL
+BRANCH_RAW=$(echo "$SONAR_UI_URL" | sed -n 's/.*[?&]branch=\([^&]*\).*/\1/p')
+
+# Decodifica %2F → /
+BRANCH=$(echo "$BRANCH_RAW" | sed 's/%2F/\//g')
+
+STATUSES_RAW=$(echo "$SONAR_UI_URL" | sed -n 's/.*[?&]issueStatuses=\([^&]*\).*/\1/p')
+
+# Default de status
+[ -z "$STATUSES_RAW" ] && STATUSES="OPEN,CONFIRMED" || STATUSES="$STATUSES_RAW"
+
+# Default branch
 [ -z "$BRANCH" ] && BRANCH="main"
-[ -z "$STATUSES" ] && STATUSES="OPEN,CONFIRMED"
 
+# ===============================
+# CONFIGURAÇÕES
+# ===============================
 OUTPUT_FILE="sonarqube-issues-safe.json"
 PAGE_SIZE=500
 TIMEOUT=15
 
 echo "=============================================="
-echo "Coleta SonarQube – via URL"
+echo "Coleta SonarQube – automática"
 echo "Host: $SONAR_URL"
 echo "Projeto: $PROJECT_KEY"
 echo "Branch: $BRANCH"
 echo "Statuses: $STATUSES"
-[ -n "$TYPES" ] && echo "Types: $TYPES"
 echo "=============================================="
 
 # ===============================
-# MONTA QUERY DINÂMICA
+# MONTA QUERY FINAL
 # ===============================
 QUERY="$SONAR_URL/api/issues/search?componentKeys=$PROJECT_KEY&branch=$BRANCH&statuses=$STATUSES&ps=$PAGE_SIZE"
 
-if [ -n "$TYPES" ]; then
-  QUERY="$QUERY&types=$TYPES"
-fi
+echo "Query API:"
+echo "$QUERY"
+echo "=============================================="
 
 # ===============================
 # EXECUÇÃO
@@ -79,6 +93,9 @@ if ! echo "$BASE_JSON" | jq -e '.issues' >/dev/null 2>&1; then
   echo "Erro ao consultar API."
   exit 1
 fi
+
+TOTAL=$(echo "$BASE_JSON" | jq '.total')
+echo "Total de issues encontradas: $TOTAL"
 
 echo "$BASE_JSON" | jq -c '.issues[]' | while read -r ISSUE; do
 
@@ -144,6 +161,6 @@ done
 echo "]" >> "$OUTPUT_FILE"
 
 echo "=============================================="
-echo "Coleta concluída"
-echo "Arquivo: $OUTPUT_FILE"
+echo "Coleta concluída com sucesso"
+echo "Arquivo gerado: $OUTPUT_FILE"
 echo "=============================================="
