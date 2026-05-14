@@ -9,7 +9,7 @@ validar_param() {
   local valor="$1"
   local nome="$2"
 
-  if [[ ! "$valor" =~ ^[a-zA-Z0-9._:/?=&-]+$ ]]; then
+   [[ ! "$valor" =~ ^[a-zA-Z0-9._:/?=&-]+$ ]]; then
     echo "Erro: $nome inválido -> $valor"
     exit 1
   fi
