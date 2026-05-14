@@ -1,60 +1,155 @@
-# Dossiê de Governança – SonarQube
+📊 SonarQube Issues Export & Interactive Report
+📌 Descrição
+Este projeto permite:
 
-Este projeto apresenta uma solução completa para:
+✅ Coletar issues do SonarQube via API (usando uma URL da interface web)
+✅ Consolidar os dados em um JSON estruturado
+✅ Visualizar as informações em um relatório HTML interativo e amigável
 
-- Extração automatizada de issues do SonarQube
-- Consolidação dos dados em JSON auditável
-- Visualização dinâmica em HTML5 (offline)
-- Apoio a governança, auditoria e qualidade de software
+O foco é atender tanto:
 
-## Conteúdo
-- Script de coleta via API do SonarQube
-- JSON consolidado com todos os dados das issues
-- Página HTML5 para consulta dinâmica
-- Documentação técnica passo a passo
+👨‍💻 usuários técnicos (detalhes completos)
+🧑‍💼 usuários não técnicos (visão simplificada e clara)
 
-## Como usar
-1. Abra o arquivo `index.html`
-2. Clique em **Carregar JSON**
-3. Selecione `sonarqube-issues-safe.json`
-4. Navegue pelas issues
 
-## Contexto
-Projeto usado como evidência técnica e estudo de caso para governança de código e dívida técnica.
+🚀 Funcionalidades
+🔹 1. Coleta automatizada via URL
+O script agora aceita diretamente:
 
-## Script de Coleta de Dados do SonarQube
+URL de Issues
+URL de Dashboard
 
-O arquivo `sonar_export_issues_v0.sh` é um script Bash responsável por
-extrair informações de qualidade de código a partir da API do SonarQube,
-gerando um arquivo JSON consolidado para uso em relatórios de governança.
+Exemplo:
+/project/issues?id=projeto&branch=main
+/dashboard?id=projeto&branch=feature/x
 
-### Objetivo
-- Automatizar a coleta de issues do SonarQube
-- Consolidar dados técnicos e metadados das regras
-- Criar um artefato auditável e independente da interface gráfica
+✅ O script extrai automaticamente:
 
-### Escopo da coleta
-O script coleta:
-- Issues abertas ou confirmadas
-- Severidade, mensagem, arquivo e linha
-- Esforço estimado (technical debt)
-- Detalhes completos das regras associadas
+Projeto (projectKey)
+Branch
+Status das issues
 
-### O que o script **não faz**
-- Não coleta histórico de alterações (changelog)
-- Não executa correções automáticas
-- Não realiza chamadas administrativas na API
 
-### Segurança
-Esta versão do script é **sanitizada**, não contendo:
-- Tokens sensíveis
-- URLs internas hardcoded
-- Credenciais de usuário
+🔹 2. Segurança
 
-Tokens e parâmetros sensíveis devem ser fornecidos via variáveis de ambiente
-ou edição manual antes da execução.
+✅ Nenhuma credencial armazenada no código
+✅ Uso de variável de ambiente:
 
-### Uso
-```bash
-chmod +x sonar_export_issues_v0.sh
-./sonar_export_issues_v0.sh
+Shellexport SONAR_TOKEN="seu_token"  # BATATINHAMostrar mais linhas
+
+🔹 3. Estrutura de dados enriquecida
+Cada issue contém:
+JSON{  "meta": {    "projectKey": "...",    "issueKey": "...",    "coletaStatus": "OK | PARTIAL"  },  "issue": { ... },  "rule": { ... },  "errors": [...]}Mostrar mais linhas
+✅ Inclui:
+
+dados completos da issue
+detalhes da regra Sonar
+rastreabilidade
+logs de erro
+
+
+🔹 4. Relatório HTML interativo
+Nova interface com foco em usabilidade:
+✅ Visão amigável (para não técnicos)
+
+
+Classificação por impacto:
+
+Alta prioridade
+Média prioridade
+Baixo impacto
+
+
+
+Resumo simples:
+
+descrição clara do problema
+arquivo afetado
+tipo de issue
+
+
+
+
+✅ Painel de indicadores
+
+Contagem por prioridade
+Visão rápida de risco do sistema
+
+
+✅ Filtros e busca
+
+🔍 Busca por texto
+🔎 Filtragem implícita por relevância
+
+
+✅ Detalhes sob demanda
+Cada issue possui botão:
+Ver detalhes técnicos
+
+✅ Ao clicar:
+
+exibe JSON completo
+mostra dados técnicos detalhados
+mantém a interface limpa inicialmente
+
+
+🎯 Benefícios
+Para usuários não técnicos
+✔ Interface limpa e organizada
+✔ Linguagem simplificada
+✔ Fácil entendimento do impacto
+✔ Foco em decisão, não em código
+
+Para usuários técnicos
+✔ Acesso ao JSON completo
+✔ Rastreamento por rule e issue
+✔ Facilidade para debug
+✔ Dados prontos para auditoria
+
+🛠️ Como usar
+1. Definir token
+Shellexport SONAR_TOKEN="seu_token"Mostrar mais linhas
+
+2. Executar script
+Shell./sonar_export_issues_v4.shMostrar mais linhas
+
+3. Informar URL
+Exemplo:
+http://sonarqube.../dashboard?id=projeto&branch=feature%2Fteste
+
+
+4. Abrir relatório
+
+Abra o arquivo HTML no navegador
+Carregue o JSON gerado
+Navegue pelas issues
+
+
+📄 Saída
+Arquivo gerado:
+sonarqube-issues-safe.json
+
+
+🔒 Considerações de Segurança
+
+Token não é armazenado
+Comunicação pode ignorar SSL em ambiente interno (-k)
+Nenhum dado sensível é persistido fora do JSON gerado
+
+
+🚧 Próximas melhorias (roadmap)
+
+📈 Gráficos (distribuição de severidades)
+📊 Dashboard executivo (nível gestão)
+⚡ Cache de regras (melhor performance)
+📄 Exportação para Excel
+🔍 Agrupamento por componente
+🧠 Insights automáticos (recomendações)
+
+
+✅ Conclusão
+Este projeto transforma dados técnicos do SonarQube em:
+👉 Informação acessível
+👉 Visual amigável
+👉 Relatório auditável
+👉 Ferramenta de decisão
