@@ -108,10 +108,10 @@ Para usuários técnicos
 
 🛠️ Como usar
 1. Definir token
-Shellexport SONAR_TOKEN="seu_token"Mostrar mais linhas
+Shellexport SONAR_TOKEN="seu_token"
 
 2. Executar script
-Shell./sonar_export_issues_v4.shMostrar mais linhas
+Shell./sonar_export_issues_v4.sh
 
 3. Informar URL
 Exemplo:
